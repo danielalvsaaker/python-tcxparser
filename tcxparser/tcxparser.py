@@ -8,6 +8,7 @@ import time
 from lxml import objectify
 
 namespace = 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'
+ns3 = 'http://www.garmin.com/xmlschemas/ActivityExtension/v2'
 
 
 class TCXParser:
@@ -23,6 +24,9 @@ class TCXParser:
     def altitude_points(self):
         return [float(x.text) for x in self.root.xpath('//ns:AltitudeMeters', namespaces={'ns': namespace})]
 
+    def speed_values(self):
+        return [round(float(x.text) * 3.6, 2) for x in self.root.findall(".//ns3:TPX/ns3:Speed", namespaces={'ns3': ns3})]
+
     def position_values(self):
         return [
             (float(pos.LatitudeDegrees.text),
@@ -33,7 +37,7 @@ class TCXParser:
         return self.root.findall('.//ns:Trackpoint/ns:DistanceMeters', namespaces={'ns': namespace})
 
     def time_values(self):
-        return [x.text for x in self.root.xpath('//ns:Time', namespaces={'ns': namespace})]
+        return [str(x.text).replace("T", "-").replace(".000Z", "") for x in self.root.xpath('//ns:Time', namespaces={'ns': namespace})]
 
     def cadence_values(self):
         return [int(x.text) for x in self.root.xpath('//ns:Cadence', namespaces={'ns': namespace})]
@@ -54,15 +58,15 @@ class TCXParser:
 
     @property
     def started_at(self):
-        return self.activity.Lap[0].attrib["StartTime"]
+        return self.activity.Lap[0].attrib["StartTime"].replace("T", "-").replace(".000Z", "")
 
     @property
     def completed_at(self):
-        return self.activity.Lap[-1].Track.Trackpoint[-1].Time.pyval
+        return self.activity.Lap[-1].Track.Trackpoint[-1].Time.pyval.replace("T", "-").replace(".000Z", "")
 
     @property
     def cadence_avg(self):
-        return self.activity.Lap[-1].Cadence
+        return round(sum(self.cadence_values()) / len(self.cadence_values()), 2)
 
     @property
     def distance(self):
@@ -87,6 +91,14 @@ class TCXParser:
         """Average heart rate of the workout"""
         hr_data = self.hr_values()
         return int(sum(hr_data) / len(hr_data))
+
+    @property
+    def speed_max(self):
+        return round(max(self.speed_values()), 2)
+
+    @property
+    def speed_avg(self):
+        return round(sum(self.speed_values()) / len(self.speed_values()), 2)
 
     @property
     def hr_max(self):
